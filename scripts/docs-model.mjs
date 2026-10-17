@@ -25,7 +25,15 @@ export const ARCH_CHAPTERS = [
   "9. 横断的制約",
 ]
 
-/** 表の章 → 列見出し */
+/**
+ * 文書の種類。
+ * - single: 構成要素が少ないときの、1 ファイルのアーキテクチャ（docs/architecture.md）
+ * - root: 構成要素が多いときの全体（docs/architecture.md）。内部の構成要素は「機能のくくり」で、詳細はくくりの文書へ置く
+ * - group: 機能のくくりの文書（docs/architecture/<くくり>.md）。全体と同じ 9 章で、そのくくりの範囲を書く
+ */
+export const ARCH_KINDS = ["single", "root", "group"]
+
+/** 表の章 → 列見出し（single・group） */
 export const ARCH_TABLES = {
   "2. 構成要素": ["構成要素", "種別", "責務", "実装spec"],
   "4. 外部インターフェース": [
@@ -40,6 +48,22 @@ export const ARCH_TABLES = {
   "7. 信頼と検証": ["対象", "信頼する前提", "検証手段", "根拠"],
   "8. 技術基盤": ["領域", "採用", "理由", "根拠"],
   "9. 横断的制約": ["制約", "値", "根拠"],
+}
+
+/** root の表の列見出し。2 章の実装spec は詳細（くくり文書へのリンク）に、4 章の方式と認証はくくり文書に置く */
+const ROOT_TABLES = {
+  "2. 構成要素": ["構成要素", "種別", "責務", "詳細"],
+  "4. 外部インターフェース": ["IF", "方向", "外部の要素", "内部の要素"],
+}
+
+export const archTables = (kind) =>
+  kind === "root" ? { ...ARCH_TABLES, ...ROOT_TABLES } : ARCH_TABLES
+
+/** 構成要素表の種別。「他機能」はくくり文書だけで使い、ほかのくくりが持つ内部の要素を指す */
+export const COMPONENT_KINDS = {
+  single: ["内部", "外部"],
+  root: ["内部", "外部"],
+  group: ["内部", "外部", "他機能"],
 }
 
 /** 文（述語で終わる記述）を書く列。ほかの列は名称・値の列で、名詞でよい */
@@ -76,8 +100,8 @@ const NONE = /^- なし$/
 // architecture
 // ---------------------------------------------------------------------------
 
-/** 機能（5章の H3、または分割ファイル全体）から「- 関与:」行・本文を取り出す */
-function functionOf({ title, no, lines, file, part }) {
+/** 機能（5章の H3）から「- 関与:」行・本文を取り出す */
+function functionOf({ title, no, lines, file }) {
   const body = nonBlank(lines)
   const first = body[0]
   const m = first && /^- 関与: (.+)$/.exec(first.text.trim())
@@ -85,86 +109,69 @@ function functionOf({ title, no, lines, file, part }) {
     title,
     no,
     file,
-    part: part ?? null,
     lines,
     involved: m ? splitList(m[1]) : null,
     involvedNo: m ? first.no : null,
   }
 }
 
-/** 5章の本文を、H3 ごとの機能と、分割ファイルへの索引行に分ける */
+/** 5章の本文を、H3 ごとの機能に分ける。H3 より前の行は preface に返す */
 function parseFunctionsChapter(sec, file) {
-  const inline = []
-  const links = []
+  const functions = []
+  const preface = []
   let cur = null
   for (const l of sec?.lines ?? []) {
     const h = !l.code && /^###\s+(.*?)\s*$/.exec(l.text)
     if (h) {
       cur = { title: h[1], no: l.no, lines: [], file }
-      inline.push(cur)
-      continue
-    }
-    const link =
-      !l.code &&
-      !cur &&
-      /^- \[([^\]]+)\]\(architecture\/([^)]+)\)(?:: (.*))?$/.exec(l.text.trim())
-    if (link) {
-      links.push({
-        title: link[1],
-        target: link[2],
-        caption: link[3] ?? "",
-        no: l.no,
-      })
+      functions.push(cur)
       continue
     }
     if (cur) cur.lines.push(l)
+    else preface.push(l)
   }
-  return { inline: inline.map(functionOf), links }
+  return { functions: functions.map(functionOf), preface }
 }
 
-/** docs/architecture.md と分割ファイルから文書モデルを作る */
-export function parseArchitecture(arch) {
-  const main = arch.main
-  const secs = main ? sectionsByH2(main.lines) : []
+/** くくり文書へのリンク（root の構成要素表の詳細列）: `[名](architecture/<ファイル>.md)` */
+const DETAIL_LINK = /^\[([^\]]+)\]\(architecture\/([^)]+)\)$/
+
+/** 1 つの architecture 文書（single・root・group）から文書モデルを作る */
+export function parseArchDoc(file, kind) {
+  const secs = sectionsByH2(file.lines)
   const sec = (title) => secs.find((s) => s.title === title) ?? null
   const table = (title) => {
     const s = sec(title)
     return s ? parseTable(s.lines) : null
   }
 
-  const compTable = table("2. 構成要素")
-  const components = (compTable?.rows ?? []).map((r) => ({
-    name: r.cells[0] ?? "",
-    kind: r.cells[1] ?? "",
-    resp: r.cells[2] ?? "",
-    specs: r.cells[3] && r.cells[3] !== "-" ? splitList(r.cells[3]) : [],
-    no: r.no,
-  }))
-
-  const ifTable = table("4. 外部インターフェース")
-  const interfaces = (ifTable?.rows ?? []).map((r) => ({
-    name: r.cells[0] ?? "",
-    dir: r.cells[1] ?? "",
-    ext: r.cells[2] ?? "",
-    int: r.cells[3] ?? "",
-    method: r.cells[4] ?? "",
-    auth: r.cells[5] ?? "",
-    no: r.no,
-  }))
-
-  const fnChapter = parseFunctionsChapter(sec("5. 機能"), main)
-  const partFunctions = arch.parts.map((p) => {
-    const lines = p.file.lines
-    const h1 = lines.find((l) => !l.code && /^#\s+/.test(l.text))
-    const rest = lines.filter((l) => l.no > (h1?.no ?? 0))
-    return functionOf({
-      title: h1 ? h1.text.replace(/^#\s+/, "").trim() : "",
-      no: h1?.no ?? 1,
-      lines: rest,
-      file: p.file,
-      part: p.name,
-    })
+  const components = (table("2. 構成要素")?.rows ?? []).map((r) => {
+    const cell = r.cells[3] ?? ""
+    const link = kind === "root" ? DETAIL_LINK.exec(cell) : null
+    return {
+      name: r.cells[0] ?? "",
+      kind: r.cells[1] ?? "",
+      resp: r.cells[2] ?? "",
+      specs: kind !== "root" && cell && cell !== "-" ? splitList(cell) : [],
+      detail: cell,
+      link: link ? { title: link[1], target: link[2] } : null,
+      no: r.no,
+    }
   })
+
+  const interfaces = (table("4. 外部インターフェース")?.rows ?? []).map(
+    (r) => ({
+      name: r.cells[0] ?? "",
+      dir: r.cells[1] ?? "",
+      ext: r.cells[2] ?? "",
+      int: r.cells[3] ?? "",
+      method: r.cells[4] ?? "",
+      auth: r.cells[5] ?? "",
+      no: r.no,
+    }),
+  )
+
+  const fnChapter = parseFunctionsChapter(sec("5. 機能"), file)
 
   /** 根拠の列を持つ行（7章・8章の4列目、9章の3列目） */
   const basis = []
@@ -173,8 +180,7 @@ export function parseArchitecture(arch) {
     ["8. 技術基盤", 3],
     ["9. 横断的制約", 2],
   ]) {
-    const t = table(title)
-    for (const r of t?.rows ?? [])
+    for (const r of table(title)?.rows ?? [])
       basis.push({
         chapter: title,
         no: r.no,
@@ -183,16 +189,61 @@ export function parseArchitecture(arch) {
   }
 
   return {
+    file,
+    kind,
     secs,
     sec,
     table,
     components,
     interfaces,
-    functions: [...fnChapter.inline, ...partFunctions],
-    inlineFunctions: fnChapter.inline,
-    partFunctions,
-    links: fnChapter.links,
+    functions: fnChapter.functions,
+    preface: fnChapter.preface,
     basis,
+  }
+}
+
+/** 構成要素表の最終列が詳細か（全体が root の形式か） */
+function hasDetailColumn(arch) {
+  const s = sectionsByH2(arch.main.lines).find((x) => x.title === "2. 構成要素")
+  return (s ? parseTable(s.lines)?.header : null)?.[3] === "詳細"
+}
+
+/**
+ * docs/architecture.md とくくりの文書から文書モデルを作る。main がなければ null を返す。
+ * mode は次のいずれか。
+ * - single: 1 ファイル（docs/architecture/ がない）
+ * - grouped: 全体 + くくりの文書（構成要素表の最終列が詳細）
+ * - legacy: docs/architecture/ にファイルがあるが、全体の最終列が詳細でない（機能ごとに分割した旧形式、または移行の途中）。
+ *   docs/architecture/ のファイルは文書として読まず、全体だけを single として読む
+ */
+export function parseArchitecture(arch) {
+  if (!arch.main) return null
+  const grouped = hasDetailColumn(arch)
+  const legacy = !grouped && arch.partEntries.length > 0
+  const main = parseArchDoc(arch.main, grouped ? "root" : "single")
+  // くくり名は、全体の構成要素表の内部の行（詳細列のリンク先ファイル）から決まる
+  const nameOfFile = new Map()
+  for (const c of main.components)
+    if (c.kind === "内部" && c.link)
+      nameOfFile.set(c.link.target.replace(/\.md$/, ""), c.name)
+  const groups = grouped
+    ? arch.parts.map((p) => ({
+        file: p.name,
+        name: nameOfFile.get(p.name) ?? null,
+        model: parseArchDoc(p.file, "group"),
+      }))
+    : []
+  const docs = [main, ...groups.map((g) => g.model)]
+  const internal = (m) => m.components.filter((c) => c.kind === "内部")
+  return {
+    mode: grouped ? "grouped" : legacy ? "legacy" : "single",
+    main,
+    groups,
+    docs,
+    /** 内部の構成要素の数（grouped はくくりの文書の内部の要素の合計。全体の内部はくくりなので数えない） */
+    internalCount: grouped
+      ? groups.reduce((n, g) => n + internal(g.model).length, 0)
+      : internal(main).length,
   }
 }
 

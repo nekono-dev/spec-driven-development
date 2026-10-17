@@ -64,6 +64,7 @@ export function statusModel(ctx) {
   const designed = ctx.specs.filter(isDesigned).length
   const required = designed >= ctx.config.architecture.minSpecs
   const cross = crossFindings(ctx).length
+  const parsed = parseArchitecture(ctx.docs.architecture)
   return {
     specs,
     pocs,
@@ -72,6 +73,9 @@ export function statusModel(ctx) {
       required,
       designedSpecs: designed,
       minSpecs: ctx.config.architecture.minSpecs,
+      mode: parsed?.mode ?? null,
+      internalComponents: parsed?.internalCount ?? 0,
+      groupMinComponents: ctx.config.architecture.groupMinComponents,
       parts: ctx.docs.architecture.parts.length,
       crossFindings: cross,
     },
@@ -99,7 +103,7 @@ function status(ctx, json) {
   out.push(
     "architecture",
     `  ${ctx.docs.architecture.mainRel}  ${a.exists ? "あり" : "なし"}（設計済み spec ${a.designedSpecs} 件、必須とする閾値 ${a.minSpecs} 件 → ${a.required ? "必須" : "任意"}）`,
-    `  分割ファイル  ${a.parts} 件`,
+    `  形式  ${a.mode === "grouped" ? `機能のくくり別（くくりの文書 ${a.parts} 件）` : a.mode === "single" ? "1 ファイル" : a.mode === "legacy" ? "旧形式（要移行）" : "-"}（内部の構成要素 ${a.internalComponents} 個、くくり別にする閾値 ${a.groupMinComponents} 個以上）`,
     `  spec・根拠との突合  ${a.crossFindings === 0 ? "指摘なし" : `${a.crossFindings} 件の指摘`}`,
   )
   process.stdout.write(out.join("\n") + "\n")
@@ -129,29 +133,30 @@ function retarget(ctx, theme, write) {
     )
     return 2
   }
-  const arch = ctx.docs.architecture
-  if (!arch.main) {
+  const parsed = parseArchitecture(ctx.docs.architecture)
+  if (!parsed) {
     process.stdout.write("付け替え対象なし（docs/architecture.md がない）\n")
     return 0
   }
-  const model = parseArchitecture(arch)
   const changes = []
-  for (const row of model.basis) {
-    if (!row.refs.some((r) => pocThemeOf(r) === theme)) continue
-    const line = arch.main.lines.find((l) => l.no === row.no)
-    const m = /^(.*\|\s*)([^|]*?)(\s*\|\s*)$/.exec(line.text)
-    if (!m) continue
-    const sep = m[2].includes("、") ? "、" : ", "
-    const next = [
-      ...new Set(row.refs.map((r) => (pocThemeOf(r) === theme ? target : r))),
-    ].join(sep)
-    changes.push({
-      no: row.no,
-      before: m[2],
-      after: next,
-      text: m[1] + next + m[3],
-    })
-  }
+  for (const doc of parsed.docs)
+    for (const row of doc.basis) {
+      if (!row.refs.some((r) => pocThemeOf(r) === theme)) continue
+      const line = doc.file.lines.find((l) => l.no === row.no)
+      const m = /^(.*\|\s*)([^|]*?)(\s*\|\s*)$/.exec(line.text)
+      if (!m) continue
+      const sep = m[2].includes("、") ? "、" : ", "
+      const next = [
+        ...new Set(row.refs.map((r) => (pocThemeOf(r) === theme ? target : r))),
+      ].join(sep)
+      changes.push({
+        file: doc.file,
+        no: row.no,
+        before: m[2],
+        after: next,
+        text: m[1] + next + m[3],
+      })
+    }
   if (changes.length === 0) {
     process.stdout.write(
       `付け替え対象なし（根拠に poc/${theme} を持つ行がない）\n`,
@@ -159,15 +164,17 @@ function retarget(ctx, theme, write) {
     return 0
   }
   for (const c of changes)
-    process.stdout.write(`${arch.main.rel}:${c.no}: ${c.before} → ${c.after}\n`)
+    process.stdout.write(`${c.file.rel}:${c.no}: ${c.before} → ${c.after}\n`)
   if (!write) {
     process.stdout.write("差分の表示のみ。適用は --write を付ける\n")
     return 0
   }
-  const file = path.resolve(arch.main.rel)
-  const raw = fs.readFileSync(file, "utf8").split("\n")
-  for (const c of changes) raw[c.no - 1] = c.text
-  fs.writeFileSync(file, raw.join("\n"))
+  for (const rel of new Set(changes.map((c) => c.file.rel))) {
+    const file = path.resolve(rel)
+    const raw = fs.readFileSync(file, "utf8").split("\n")
+    for (const c of changes) if (c.file.rel === rel) raw[c.no - 1] = c.text
+    fs.writeFileSync(file, raw.join("\n"))
+  }
   process.stdout.write(
     `適用した。表の桁を整えるため prettier --write docs を実行する\n`,
   )

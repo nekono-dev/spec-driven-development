@@ -1,7 +1,7 @@
 /**
  * architecture・PoC・設定・補助コマンドの自己テスト（selftest.mjs から読み込まれる）。
  *
- * - 雛形（architecture.md・poc-readme.md）が、3 つの spec を持つリポジトリでチェックを通過すること
+ * - 雛形（architecture.md・architecture-grouped/・poc-readme.md）が、spec を持つリポジトリでチェックを通過すること
  * - 雛形を1か所ずつ崩したとき、対応するルールが検出されること（docCases。全ルール ID の網羅は selftest.mjs が強制する）
  * - 設定ファイル・--status・--retarget-poc・--check-poc-committed の挙動
  */
@@ -37,15 +37,47 @@ const DEFAULTS = {
   "../poc/storage-cost/measure.md": () => "測定値\n",
 }
 
-/** architecture と PoC の雛形を配置した edits。edits のキーが既定の配置先なら、雛形に対する編集になる */
-export function arch(edits = {}) {
+/** 雛形の既定の配置に edits を重ねる。edits のキーが既定の配置先なら、雛形に対する編集になる */
+function layer(defaults, edits) {
   const out = {}
-  for (const [k, def] of Object.entries(DEFAULTS))
+  for (const [k, def] of Object.entries(defaults))
     out[k] =
       k in edits ? (edits[k] === null ? null : () => edits[k](def())) : def
-  for (const [k, v] of Object.entries(edits)) if (!(k in DEFAULTS)) out[k] = v
+  for (const [k, v] of Object.entries(edits)) if (!(k in defaults)) out[k] = v
   return out
 }
+
+/** architecture と PoC の雛形を配置した edits */
+export const arch = (edits = {}) => layer(DEFAULTS, edits)
+
+/** くくり別の architecture（全体 + くくりの文書 3 件。内部の構成要素 8 個）の雛形が参照する spec 名 */
+export const GROUPED_SPECS = [
+  "publish-api",
+  "recipient-registry",
+  "delivery-worker",
+  "notification-store",
+  "read-position",
+  "notification-badge",
+  "notification-api",
+  "notification-list",
+]
+
+const GDIR = path.join(templates, "architecture-grouped")
+const G = {
+  root: "../docs/architecture.md",
+  publish: "../docs/architecture/publish.md",
+  store: "../docs/architecture/store.md",
+  display: "../docs/architecture/display.md",
+}
+const gread = (f) => fs.readFileSync(path.join(GDIR, f), "utf8")
+const GROUPED_DEFAULTS = {
+  [G.root]: () => gread("architecture.md"),
+  [G.publish]: () => gread("publish.md"),
+  [G.store]: () => gread("store.md"),
+  [G.display]: () => gread("display.md"),
+}
+/** くくり別の architecture の雛形を配置した edits */
+export const grouped = (edits = {}) => layer(GROUPED_DEFAULTS, edits)
 
 const a = (fn) => arch({ [ARCH]: fn })
 const p = (fn) => arch({ [POC]: fn })
@@ -64,17 +96,9 @@ const FIRST_FUNCTION = read("architecture.md")
   .match(/### 通知の発行\n\n([\s\S]*?)(?=### 未読件数の表示)/)[1]
   .trimEnd()
 const PART = "../docs/architecture/notification-publish.md"
-const SPLIT_INDEX =
-  "- [通知の発行](architecture/notification-publish.md): 配信ワーカーは、宛先の有効性に応じて通知を受理か拒否に分ける。\n\n"
-/** 1 つ目の機能を分割ファイルへ移した edits */
-const split = (partEdit = (t) => t, archEdit = (t) => t) =>
-  arch({
-    [ARCH]: (t) =>
-      archEdit(
-        sub(/### 通知の発行\n[\s\S]*?(?=### 未読件数の表示)/, SPLIT_INDEX)(t),
-      ),
-    [PART]: () => partEdit(`# 通知の発行\n\n${FIRST_FUNCTION}\n`),
-  })
+
+const gr = (file, fn) => grouped({ [file]: fn })
+const cfgOf = (obj) => ({ "../.spec-driven.json": () => JSON.stringify(obj) })
 
 /** 検証中の PoC（結論なし・結果なし・反映先なし） */
 const pendingPoc = () =>
@@ -97,16 +121,24 @@ export const docCases = [
   ],
   ["設計済み spec が閾値以上で architecture.md がない", {}, "S010", ARCH_SPECS],
   [
-    "分割ファイル名が不正",
-    arch({ "../docs/architecture/Bad_Name.md": () => "# x\n" }),
+    "全体が 1 ファイルの形式のまま docs/architecture/ にファイルがある（機能ごとの旧形式）",
+    arch({ [PART]: () => `# 通知の発行\n\n${FIRST_FUNCTION}\n` }),
     "S011",
     ARCH_SPECS,
   ],
   [
-    "分割ファイルが索引からリンクされていない",
-    arch({ [PART]: () => `# 通知の発行\n\n${FIRST_FUNCTION}\n` }),
+    "くくりの文書のファイル名が不正",
+    grouped({ "../docs/architecture/Bad_Name.md": () => "# x\n" }),
     "S011",
-    ARCH_SPECS,
+    GROUPED_SPECS,
+  ],
+  [
+    "くくりの文書が構成要素表からリンクされていない",
+    grouped({
+      "../docs/architecture/extra.md": () => "# 追加 アーキテクチャ\n",
+    }),
+    "S011",
+    GROUPED_SPECS,
   ],
   [
     "設計済み spec が実装spec にない",
@@ -251,20 +283,39 @@ export const docCases = [
     ARCH_SPECS,
   ],
   [
-    "どの機能にも現れない内部の要素がある",
+    "内部の要素どうしの呼び出しだけで、関与が 2 件の機能",
     a(
-      rep(
-        "| 配信ワーカー   | 内部 | 通知を宛先ごとに振り分けて保管する | delivery-worker    |\n",
-        "| 配信ワーカー   | 内部 | 通知を宛先ごとに振り分けて保管する | delivery-worker    |\n| 監視           | 内部 | 稼働状況を記録する | delivery-worker    |\n",
+      sub(
+        /### 未読件数の表示\n/,
+        `### 通知の整形
+
+- 関与: 通知API、配信ワーカー
+
+通知の整形は、通知の有無で応答が分岐する。
+
+\`\`\`mermaid
+sequenceDiagram
+  participant api as 通知API
+  participant worker as 配信ワーカー
+  api->>worker: 通知の取得
+  alt 通知がある
+    worker-->>api: 整形した通知
+  else 通知がない
+    worker-->>api: 空の応答
+  end
+\`\`\`
+
+### 未読件数の表示
+`,
       ),
     ),
-    "F-A15",
+    "F-A17",
     ARCH_SPECS,
   ],
   [
-    "分割ファイルの機能名が索引と違う",
-    split(rep("# 通知の発行", "# 別の名前")),
-    "F-A16",
+    "1 つの文書に置く機能が上限を超える",
+    arch({ ...cfgOf({ architecture: { maxFunctions: 1 } }) }),
+    "F-A18",
     ARCH_SPECS,
   ],
   [
@@ -405,6 +456,127 @@ export const docCases = [
     "W002",
     ARCH_SPECS,
   ],
+  // ---- くくり別の architecture（全体 + くくりの文書） ----
+  [
+    "内部の構成要素が閾値以上なのに 1 ファイルのまま",
+    arch(cfgOf({ architecture: { groupMinComponents: 3 } })),
+    "S019",
+    ARCH_SPECS,
+  ],
+  [
+    "内部の構成要素が閾値未満なのにくくり別に分けている",
+    grouped(cfgOf({ architecture: { groupMinComponents: 9 } })),
+    "S019",
+    GROUPED_SPECS,
+  ],
+  [
+    "くくりの文書の 1 行目が全体のくくり名と違う",
+    gr(G.store, rep("# 通知の保管 アーキテクチャ", "# 保管 アーキテクチャ")),
+    "S011",
+    GROUPED_SPECS,
+  ],
+  [
+    "設計済み spec が、くくりの文書のどの実装spec にもない",
+    grouped(),
+    "S012",
+    [...GROUPED_SPECS, "extra-spec"],
+  ],
+  [
+    "実装spec が複数のくくりの文書に現れる",
+    gr(G.store, rep("| read-position      |", "| publish-api        |")),
+    "S012",
+    GROUPED_SPECS,
+  ],
+  [
+    "他機能の要素が別のくくりの文書の内部にない",
+    gr(
+      G.publish,
+      rep("| 配信ワーカー   | 他機能", "| 存在しない要素 | 他機能"),
+    ),
+    "S020",
+    GROUPED_SPECS,
+  ],
+  [
+    "くくりの文書の外部の要素が全体の外部にない",
+    gr(G.display, rep("| 利用者       | 外部", "| 閲覧者       | 外部")),
+    "S021",
+    GROUPED_SPECS,
+  ],
+  [
+    "全体の IF の方向がくくりの文書と違う",
+    gr(G.root, rep("| 提供 | 発行元システム |", "| 利用 | 発行元システム |")),
+    "S021",
+    GROUPED_SPECS,
+  ],
+  [
+    "1 つのくくりの spec だけを根拠にする行が全体にある",
+    gr(G.root, rep("publish-api、delivery-worker", "publish-api")),
+    "S022",
+    GROUPED_SPECS,
+  ],
+  [
+    "他のくくりの spec を根拠にする行がくくりの文書にある",
+    gr(G.display, rep("| notification-api |", "| delivery-worker |")),
+    "S022",
+    GROUPED_SPECS,
+  ],
+  [
+    "全体の構成要素表の詳細が、くくり名のリンクでない",
+    gr(G.root, rep("[通知の発行](architecture/publish.md)", "publish")),
+    "F-A06",
+    GROUPED_SPECS,
+  ],
+  [
+    "機能のくくりの数が範囲外",
+    grouped(cfgOf({ architecture: { groupCount: [4, 10] } })),
+    "F-A19",
+    GROUPED_SPECS,
+  ],
+  [
+    "くくりの文書の内部の要素が範囲外",
+    grouped(cfgOf({ architecture: { groupComponents: [2, 2] } })),
+    "F-A19",
+    GROUPED_SPECS,
+  ],
+  [
+    "全体の関係図に、くくりの文書から導いた依存がない",
+    gr(
+      G.root,
+      rep('  display["通知の表示"] --> store\n', '  display["通知の表示"]\n'),
+    ),
+    "F-A20",
+    GROUPED_SPECS,
+  ],
+  [
+    "全体の関係図に、くくりの文書にない依存がある",
+    gr(
+      G.root,
+      rep(
+        '  display["通知の表示"] --> store\n',
+        '  display["通知の表示"] --> store\n  store --> publish\n',
+      ),
+    ),
+    "F-A20",
+    GROUPED_SPECS,
+  ],
+  [
+    "くくりの文書の関係図が循環する",
+    gr(
+      G.display,
+      rep(
+        '  api --> worker["配信ワーカー"]\n',
+        '  api --> worker["配信ワーカー"]\n  worker --> badge\n',
+      ),
+    ),
+    "G009",
+    GROUPED_SPECS,
+  ],
+  [
+    "くくりの文書の目的が「。」で終わらない",
+    gr(G.store, rep("管理する。\n", "管理する\n")),
+    "W010",
+    GROUPED_SPECS,
+  ],
 ]
 
 for (const [name, edits, rule, specNames] of docCases) {
@@ -433,9 +605,47 @@ test("architecture の出力は冪等", () => {
   assert.deepEqual(run(root), run(root))
 })
 
-test("機能を分割ファイルへ移しても通過する", () => {
-  const r = runFull(makeRoot(split(), ARCH_SPECS))
+test("くくり別の architecture の雛形はすべてのチェックを通過する", () => {
+  assert.equal(depsProblem, null, depsProblem)
+  const r = runFull(makeRoot(grouped(), GROUPED_SPECS))
   assert.deepEqual(r.findings, [])
+  assert.equal(r.code, 0)
+})
+
+test("構成要素が閾値未満なら 1 ファイルのままでよく、設定で閾値を下げるとくくり別にできる", () => {
+  assert.deepEqual(run(makeRoot(arch(), ARCH_SPECS)).findings, [])
+  const cfg = cfgOf({ architecture: { groupMinComponents: 8 } })
+  assert.deepEqual(run(makeRoot(grouped(cfg), GROUPED_SPECS)).findings, [])
+})
+
+test("旧形式（機能ごとの分割ファイル）は、ファイルごとの指摘ではなく移行の 1 件にまとまる", () => {
+  const r = run(
+    makeRoot(
+      arch({ [PART]: () => `# 通知の発行\n\n${FIRST_FUNCTION}\n` }),
+      ARCH_SPECS,
+    ),
+  )
+  assert.deepEqual(
+    r.findings.map((f) => `${f.file} ${f.rule}`),
+    ["docs/architecture S011"],
+  )
+  assert.match(r.findings[0].message, /旧形式/)
+})
+
+test("くくりの文書の指摘は、その文書のパスで報告される", () => {
+  const r = run(
+    makeRoot(gr(G.store, rep("管理する。\n", "管理する\n")), GROUPED_SPECS),
+  )
+  const f = r.findings.find((x) => x.rule === "W010")
+  assert.equal(f.file, "docs/architecture/store.md")
+})
+
+test("architecture を対象にすると、くくりの文書も検査する", () => {
+  const root = makeRoot(
+    gr(G.store, rep("管理する。\n", "管理する\n")),
+    GROUPED_SPECS,
+  )
+  assert.equal(run(root, "architecture").code, 1)
 })
 
 test("architecture の W001・W004 は経緯・進捗の語を検出する", () => {
@@ -522,6 +732,12 @@ test("設定ファイルの誤りは終了コード 2 で止まる", () => {
     ["範囲外（上限）", '{"poc": {"maxPending": 11}}'],
     ["型違い", '{"architecture": {"maxLines": "400"}}'],
     ["関与数の逆転", '{"architecture": {"functionComponents": [6, 2]}}'],
+    ["くくりの要素数の逆転", '{"architecture": {"groupComponents": [5, 2]}}'],
+    ["くくりの数が範囲外", '{"architecture": {"groupCount": [1, 5]}}'],
+    [
+      "くくり別にする閾値が範囲外",
+      '{"architecture": {"groupMinComponents": 1}}',
+    ],
   ]
   for (const [name, text] of bad) {
     const r = run(makeRoot({ "../.spec-driven.json": () => text }))
@@ -542,6 +758,29 @@ test("--show-config は実効値を表示する", () => {
   assert.equal(cfg.poc.maxPending, 5)
   assert.equal(cfg.architecture.minSpecs, 3)
   assert.deepEqual(cfg.architecture.functionComponents, [2, 6])
+  assert.deepEqual(cfg.architecture.groupComponents, [2, 8])
+  assert.deepEqual(cfg.architecture.groupCount, [3, 10])
+  assert.equal(cfg.architecture.groupMinComponents, 8)
+  assert.equal(cfg.architecture.maxGroupLines, 300)
+  assert.equal(cfg.architecture.maxFunctions, 5)
+})
+
+test("設定の雛形は初期値と一致する", () => {
+  const show = (edits) =>
+    JSON.parse(
+      spawnSync(
+        process.execPath,
+        [checkAll, "--root", "specs", "--show-config"],
+        { cwd: makeRoot(edits), encoding: "utf8" },
+      ).stdout,
+    )
+  assert.deepEqual(
+    show({ "../.spec-driven.json": () => read("spec-driven.json") }),
+    show({}),
+  )
+  assert.deepEqual(show({}).architecture, {
+    ...JSON.parse(read("spec-driven.json")).architecture,
+  })
 })
 
 test("architecture・PoC を対象に指定できる", () => {
@@ -581,6 +820,25 @@ test("--status は成果物から工程を導出する", () => {
   ])
   assert.equal(m.architecture.required, true)
   assert.equal(m.architecture.crossFindings, 0)
+})
+
+test("--status は architecture の形式（1 ファイルかくくり別か）を導出する", () => {
+  const status = (edits, specs) => {
+    const r = spawnSync(
+      process.execPath,
+      [checkAll, "--root", "specs", "--status", "--json"],
+      { cwd: makeRoot(edits, specs), encoding: "utf8" },
+    )
+    return JSON.parse(r.stdout).architecture
+  }
+  const single = status(arch(), ARCH_SPECS)
+  assert.equal(single.mode, "single")
+  assert.equal(single.internalComponents, 3)
+  const multi = status(grouped(), GROUPED_SPECS)
+  assert.equal(multi.mode, "grouped")
+  assert.equal(multi.internalComponents, 8)
+  assert.equal(multi.parts, 3)
+  assert.equal(multi.crossFindings, 0)
 })
 
 test("PoC の状態: 結論なしは検証中、反映先なしは反映待ち", () => {
@@ -652,6 +910,36 @@ test("--retarget-poc は信頼と検証の根拠も付け替える", () => {
     /配信ワーカーが API キーの一致を確認する +\| delivery-worker/,
   )
   assert.ok(!after.includes("poc/storage-cost"))
+})
+
+test("--retarget-poc はくくりの文書の根拠も付け替える", () => {
+  const root = makeRoot(
+    grouped({
+      [G.store]: sub(
+        /(1回の問い合わせで行える +\| )notification-store/,
+        "$1poc/storage-cost",
+      ),
+      [POC]: () =>
+        read("poc-readme.md").replace(
+          "- delivery-worker",
+          "- notification-store",
+        ),
+      "../poc/storage-cost/measure.md": () => "測定値\n",
+    }),
+    GROUPED_SPECS,
+  )
+  const r = spawnSync(
+    process.execPath,
+    [checkAll, "--root", "specs", "--retarget-poc", "storage-cost", "--write"],
+    { cwd: root, encoding: "utf8" },
+  )
+  assert.equal(r.status, 0, r.stderr)
+  const after = fs.readFileSync(
+    path.join(root, "docs", "architecture", "store.md"),
+    "utf8",
+  )
+  assert.ok(!after.includes("poc/storage-cost"))
+  assert.match(after, /データ保管 .*\| notification-store/)
 })
 
 test("--retarget-poc は反映先が決まらない PoC を拒否する", () => {

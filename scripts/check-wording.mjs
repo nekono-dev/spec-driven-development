@@ -4,10 +4,11 @@
  * コードブロック内は対象外（W008 の重複検出も同様）。ただし mermaid の図は
  * 設計書の本文とみなし、W008 以外のルールを適用する（図の行は設計上重複しうるため）。
  *
- * architecture（docs/architecture.md・分割ファイル）には、W001・W002・W004・W005・W007 に加えて
+ * architecture（docs/architecture.md・くくりの文書）には、W001・W002・W004・W005・W007 に加えて
  * W009〜W014 を適用する。PoC の README には W002・W007 だけを適用する（手順と結果を書く文書のため）。
  */
 import { pathToFileURL } from "node:url"
+import { parseArchitecture } from "./docs-model.mjs"
 import { finding, isTableLine, runCli, splitRow } from "./lib.mjs"
 
 export const title = "表現チェック（check-wording）"
@@ -136,12 +137,12 @@ const SENTENCE_COLUMNS = {
   "8. 技術基盤": [2],
 }
 
-/** architecture（主文書と分割ファイル）の語彙・文体・参照・重複 */
+/** architecture（全体とくくりの文書）の語彙・文体・参照・重複 */
 function checkArchitecture(ctx) {
   const out = []
   const arch = ctx.docs.architecture
   if (!ctx.targetArch) return out
-  const files = [arch.main, ...arch.parts.map((p) => p.file)].filter(Boolean)
+  const files = (parseArchitecture(arch)?.docs ?? []).map((d) => d.file)
   if (files.length === 0) return out
 
   const specNames = ctx.specs.map((s) => s.name)
@@ -236,9 +237,7 @@ function checkArchitecture(ctx) {
         const body = t.trim()
         if (body === "" || NONE_LINE.test(body) || /^- 関与: /.test(body))
           continue
-        const text = body
-          .replace(/^- \[[^\]]+\]\([^)]+\): /, "")
-          .replace(/^- /, "")
+        const text = body.replace(/^- /, "")
         const n = [...text].length
         if (!text.endsWith("。") || text.split("。").length !== 2)
           add(l.no, "W010", "各行は「。」で終わる1文にする")

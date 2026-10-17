@@ -15,7 +15,7 @@ description: 機能の新規追加・修正に着手する前に、specs/<compon
 
 依存は一方向: `tasks.md` → `design.md` → `requirements.md`。実装や作業の都合で要件・設計を歪めない。
 
-中〜大規模の開発（設計済みの spec が設定の閾値以上。初期 3 件）では、spec に加えて、システム全体の構造を人間が読める形で示す **`docs/architecture.md`** を必須とする。architecture.md は spec と PoC を根拠にした下流の文書で、`npm run lint:spec` が spec との突合・体裁・語彙・図を検査する。新規開発では PoC（`poc/<テーマ>/README.md`）で技術リスクを検証してから spec と architecture.md を確定する。手順と判断基準は `references/workflow.md`、雛形は `templates/architecture.md`・`templates/poc-readme.md`。
+中〜大規模の開発（設計済みの spec が設定の閾値以上。初期 3 件）では、spec に加えて、システム全体の構造を人間が読める形で示す **`docs/architecture.md`** を必須とする。architecture.md は spec と PoC を根拠にした下流の文書で、`npm run lint:spec` が spec との突合・体裁・語彙・図を検査する。内部の構成要素が設定の閾値以上（初期 8 個）になったら、構成要素を **機能のくくり** にまとめ、全体の `docs/architecture.md` と、くくりごとの `docs/architecture/<くくり>.md`（全体と同じ 9 章構成）に分ける。くくりは「利用者から見て 1 つの目的で説明できる機能のまとまり」（例: 通知の発行、通知の保管、通知の表示）で、構成要素ごと・振る舞いごとに文書を作らない。新規開発では PoC（`poc/<テーマ>/README.md`）で技術リスクを検証してから spec と architecture.md を確定する。手順と判断基準は `references/workflow.md`、雛形は `templates/architecture.md`（1 ファイル）・`templates/architecture-grouped/`（全体 + くくり）・`templates/poc-readme.md`。
 
 仕様駆動開発の目的は、開発の整合性を保ち、何をなぜ作ったかを明白（ホワイトボックス）にすることである。仕様にない作業を禁止する仕組みではない。突発的なバグ修正等で spec を経ずにコードを変更してよいが、その変更が既存 spec の要件・設計と食い違う場合は、同じ変更の中で該当 spec を更新する。
 
@@ -23,17 +23,17 @@ description: 機能の新規追加・修正に着手する前に、specs/<compon
 
 ```
 .claude/skills/spec-driven-development/
-├── templates/          # 雛形（記入例。そのままチェックを通過する）。spec の3点セット・architecture.md・poc-readme.md・spec-driven.json
+├── templates/          # 雛形（記入例。そのままチェックを通過する）。spec の3点セット・architecture.md・architecture-grouped/（全体 + くくり3件）・poc-readme.md・spec-driven.json
 ├── references/
 │   ├── rules.md        # 全ルールの一覧（スクリプトから生成。手で編集しない）
-│   └── workflow.md     # architecture と PoC の手順・判断基準・目視確認・設定
+│   └── workflow.md     # architecture（1 ファイルとくくり別）と PoC の手順・判断基準・目視確認・設定
 └── scripts/
     ├── check-all.mjs        # 一括実行（npm run lint:spec）
-    ├── check-structure.mjs  # S系: ディレクトリ構成・spec 間の独立性
+    ├── check-structure.mjs  # S系: ディレクトリ構成・spec 間の独立性・architecture と spec／PoC／くくりの文書の突合
     ├── check-format.mjs     # F系: 雛形どおりの体裁・ID・トレーサビリティ・サイズ上限
     ├── check-diagram.mjs    # G系: 関係図・ワークフロー図（mermaid）の構造と、構成表・設計項目との対応
     ├── check-wording.mjs    # W系: 規定にそぐわない語・表現（spec・architecture・PoC）
-    ├── check-architecture.mjs # F-A系: docs/architecture.md の章立て・表と図の対応・機能の関与
+    ├── check-architecture.mjs # F-A系: docs/architecture.md とくくりの文書の章立て・表と図の対応・機能の関与・くくり間の依存
     ├── check-poc.mjs        # F-P系: poc/<テーマ>/README.md の体裁と結論・結果の整合
     ├── docs-model.mjs       # architecture・PoC の文書モデル（各チェックと --status が共有）
     ├── commands.mjs         # --status／--retarget-poc／--check-poc-committed／--show-config
@@ -45,6 +45,18 @@ description: 機能の新規追加・修正に着手する前に、specs/<compon
     ├── selftest-docs.mjs    # architecture・PoC・設定・補助コマンドのテスト
     └── selftest-lib.mjs     # テストの共通部
 ```
+
+## 開始時のスキル更新
+
+このスキルを使い始めるとき（spec・architecture・PoC の作業に着手する前）に、最初に 1 回だけ、スキル自身を最新にする。スキルのディレクトリは、この SKILL.md があるディレクトリ（symlink は `realpath` で実体を辿る）。
+
+1. スキルのディレクトリが git の作業ツリーの最上位か確認する: `git -C <スキルのディレクトリ> rev-parse --show-toplevel` が、そのディレクトリ自身を返す。
+2. 返すなら `git -C <スキルのディレクトリ> pull --ff-only` を実行する。
+3. 取り込みがあった（"Already up to date." 以外）ときは、更新後の `SKILL.md` を読み直し、`scripts/package.json` か `scripts/package-lock.json` が変わっていれば `scripts/` で `npm ci --ignore-scripts` を実行する。
+4. 失敗した（未コミットの変更、履歴の分岐、ネットワーク不通）ときは、強制せず（`reset`・`stash`・`--force` を使わない）、失敗の理由を 1 行で利用者に伝えて、現在の版のまま作業を続ける。
+5. git の作業ツリーでない（プロジェクトへの単なるコピー）ときは、更新できないことを 1 行で利用者に伝え、`git clone git@github.com.nekono:nekono-dev/spec-driven-development.git ~/.claude/skills/spec-driven-development` での導入を勧めて、そのまま作業を続ける。
+
+同じ会話の中では繰り返さない。利用者が更新しないよう指示したときは行わない。
 
 ## 手順
 
@@ -78,7 +90,7 @@ description: 機能の新規追加・修正に着手する前に、specs/<compon
 
 ## ディレクトリ規則（S系）
 
-- **1ディレクトリ = 1コンポーネント**。実装上のまとまり（例: `creator-richtext`、`entry-api`）ごとに `specs/` 直下へ作る。1コンポーネントに複数の FR を含めてよいが、FR が複数コンポーネントにまたがる場合はコンポーネントごとに分割する。
+- **1ディレクトリ = 1コンポーネント**。実装上のまとまり（例: `notification-api`、`delivery-worker`）ごとに `specs/` 直下へ作る。1コンポーネントに複数の FR を含めてよいが、FR が複数コンポーネントにまたがる場合はコンポーネントごとに分割する。
 - **階層を作らない**。`specs/<component>/` の下にサブディレクトリや3ファイル以外を置かない。`requirements.md` は必須で、`design.md` と `tasks.md` は両方置くか両方置かない（両方なしは「要件のみ」の spec）。
 - **他 spec と関係を持たせない**。他 spec への言及は `requirements.md` の「3. 前提」に `- 前提: <spec名> — <理由>` の形式でのみ書ける（2件以内）。前提先の spec 自身は前提を持てない（連鎖・循環の禁止）。design.md・tasks.md からは他 spec に一切言及しない。
 - 全タスクが完了（`[x]`）した spec は、次を満たさなければならない（仕様と実装の乖離検出）。

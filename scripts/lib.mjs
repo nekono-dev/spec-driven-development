@@ -208,6 +208,9 @@ const CONFIG_SCHEMA = {
     minSpecs: { def: 3, min: 1, max: 50 },
     maxLines: { def: 400, min: 200, max: 800 },
     maxFunctionLines: { def: 80, min: 40, max: 150 },
+    maxGroupLines: { def: 300, min: 150, max: 600 },
+    maxFunctions: { def: 5, min: 1, max: 20 },
+    groupMinComponents: { def: 8, min: 2, max: 50 },
     mergeSimilarity: { def: 0.8, min: 0.5, max: 1, float: true },
   },
   poc: {
@@ -215,7 +218,12 @@ const CONFIG_SCHEMA = {
     maxPending: { def: 3, min: 1, max: 10 },
   },
 }
-const FUNCTION_COMPONENTS = { def: [2, 6], min: 2, max: 10 }
+/** 範囲（[最小, 最大]）を取る設定。architecture 配下に置く */
+const RANGES = {
+  functionComponents: { def: [2, 6], min: 2, max: 10 },
+  groupComponents: { def: [2, 8], min: 1, max: 20 },
+  groupCount: { def: [3, 10], min: 2, max: 30 },
+}
 
 /** 実効値の設定を返す。ファイルがなければ初期値。未知のキー・範囲外・型違いは ConfigError */
 export function loadConfig(repoRoot) {
@@ -241,7 +249,8 @@ export function loadConfig(repoRoot) {
     if (given === null || typeof given !== "object" || Array.isArray(given))
       throw new ConfigError(`${CONFIG_FILE}: ${group} はオブジェクトにする`)
     const known = new Set(Object.keys(items))
-    if (group === "architecture") known.add("functionComponents")
+    if (group === "architecture")
+      for (const k of Object.keys(RANGES)) known.add(k)
     for (const key of Object.keys(given))
       if (!known.has(key))
         throw new ConfigError(`${CONFIG_FILE}: 未知のキー「${group}.${key}」`)
@@ -261,22 +270,19 @@ export function loadConfig(repoRoot) {
       out[group][key] = v
     }
   }
-  const fc = raw.architecture?.functionComponents ?? FUNCTION_COMPONENTS.def
-  const fcOk =
-    Array.isArray(fc) &&
-    fc.length === 2 &&
-    fc.every(
-      (n) =>
-        Number.isInteger(n) &&
-        n >= FUNCTION_COMPONENTS.min &&
-        n <= FUNCTION_COMPONENTS.max,
-    ) &&
-    fc[0] <= fc[1]
-  if (!fcOk)
-    throw new ConfigError(
-      `${CONFIG_FILE}: architecture.functionComponents は [最小, 最大]（整数 ${FUNCTION_COMPONENTS.min}〜${FUNCTION_COMPONENTS.max}、最小 ≦ 最大）にする（指定値: ${JSON.stringify(fc)}）`,
-    )
-  out.architecture.functionComponents = fc
+  for (const [key, spec] of Object.entries(RANGES)) {
+    const v = raw.architecture?.[key] ?? spec.def
+    const ok =
+      Array.isArray(v) &&
+      v.length === 2 &&
+      v.every((n) => Number.isInteger(n) && n >= spec.min && n <= spec.max) &&
+      v[0] <= v[1]
+    if (!ok)
+      throw new ConfigError(
+        `${CONFIG_FILE}: architecture.${key} は [最小, 最大]（整数 ${spec.min}〜${spec.max}、最小 ≦ 最大）にする（指定値: ${JSON.stringify(v)}）`,
+      )
+    out.architecture[key] = v
+  }
   return out
 }
 

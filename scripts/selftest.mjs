@@ -217,7 +217,7 @@ const cases = [
     {
       "sample/requirements.md": rep(
         "- なし\n\n## 4",
-        "- creator-mode に依存する。\n\n## 4",
+        "- other-spec に依存する。\n\n## 4",
       ),
     },
     "F-R07",
