@@ -1,0 +1,60 @@
+name: spec-lint
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "lint/**"
+      - "skill/templates/**"
+      - "skill/references/rules.md"
+      - ".github/workflows/publish.yml"
+  pull_request:
+    paths:
+      - "lint/**"
+      - "skill/templates/**"
+      - "skill/references/rules.md"
+      - ".github/workflows/publish.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npm test
+
+  # main への push だけが GitHub Packages へ発行する。版の連番は実行番号から付ける
+  publish:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: publish
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@nekono-dev"
+      - run: npm ci --ignore-scripts
+      - name: 版を決める（<メジャー>.<マイナー>.<実行番号>）
+        run: |
+          base=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
+          npm version "${base}.${GITHUB_RUN_NUMBER}" --no-git-tag-version
+      - run: npm publish --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

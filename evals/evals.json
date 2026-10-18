@@ -1,0 +1,26 @@
+{
+  "skill_name": "spec-driven-development",
+  "evals": [
+    {
+      "id": 1,
+      "name": "new-spec-from-scratch",
+      "prompt": "未読の通知件数をヘッダーにバッジで表示する機能を追加したい。何もない空のプロジェクトだけど、実装に入る前に仕様をちゃんと整備しておいて。上限件数や表示形式など細かい点は適当に決めて進めて構わない。",
+      "expected_output": "specs/<component>/ に requirements.md・design.md・tasks.md が揃い、spec-lint が指摘 0 件で通る。利用者への確認で止まらず、決めた点を報告に書く。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "fix-progress-notes-in-spec",
+      "prompt": "specs/notification-badge の design.md に実装状況の表や TODO を書いてしまっていた。仕様書として正しい形に直して。",
+      "expected_output": "進捗管理的な記述（実装状況・未実装・TODO・検討中）が design.md から除かれ、判断を要した事項は決めた内容で本文に反映され、spec-lint が指摘 0 件で通る。",
+      "files": ["fixtures/fix-progress-spec"]
+    },
+    {
+      "id": 3,
+      "name": "architecture-for-three-specs",
+      "prompt": "specs に設計済みの spec が 3 つ揃った。システム全体の構造がわかる docs/architecture.md を作って。承認待ちで止まらず、最後まで仕上げて報告して。",
+      "expected_output": "docs/architecture.md が 9 章構成で作られ、構成要素表が 3 つの spec と過不足なく対応し、spec-lint が指摘 0 件で通る。選んだ構成と根拠を報告に書く。",
+      "files": ["fixtures/architecture-three-specs"]
+    }
+  ]
+}

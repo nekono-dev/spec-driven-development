@@ -1,0 +1,23 @@
+[
+  {"query": "ユーザー設定画面にダークモード切替を足したい。いきなり実装する前に、このリポジトリの specs 以下に要件と設計とタスクをまとめておいてくれる？", "should_trigger": true},
+  {"query": "specs/payment-api/design.md を読んだら「実装状況」って表があって、未実装とかTODOだらけになってる。仕様書ってこういうの書かない決まりだったよね、直しといて", "should_trigger": true},
+  {"query": "要件定義書書いて。通知の既読管理機能。受け入れ条件もつけて", "should_trigger": true},
+  {"query": "spec-lint が W001 で落ちてるんだけど、何が原因？ specs/search/requirements.md の指摘を直して", "should_trigger": true},
+  {"query": "うちのリポジトリ、設計済みの spec が4つになったから docs/architecture.md 作ったほうがいいよね？全体構成図つきで作って", "should_trigger": true},
+  {"query": "Cloud Storage の料金枠で足りるか不安。本実装の前に poc/storage-cost/README.md で検証してから設計に反映したい", "should_trigger": true},
+  {"query": "CIで仕様書の検査を回したい。GitHub Actions のワークフローに spec-lint を組み込んで", "should_trigger": true},
+  {"query": "tasks.md のチェックボックスを全部埋めたけど、AC のテスト名に spec 名/AC-n を付けてないって怒られる。どう直す？", "should_trigger": true},
+  {"query": "design.md の関係図が構成表と合わないって G003 が出た。mermaid を直して", "should_trigger": true},
+  {"query": "新機能の開発を始めたい。まず何から手をつければいい？うちは仕様駆動でやってる前提で、specs を作るところからお願い", "should_trigger": true},
+  {"query": "AWS でマイクロサービスを組むときのアーキテクチャのベストプラクティスを教えて。ECS と Lambda どっちがいい？", "should_trigger": false},
+  {"query": "OpenAPI 3.1 の仕様書（openapi.yaml）を書いて。/users の CRUD で", "should_trigger": false},
+  {"query": "READMEのアーキテクチャ節に、今のディレクトリ構成を説明する文章を足しておいて。specs とかは特にない小さいツールです", "should_trigger": false},
+  {"query": "この関数のユニットテストを vitest で書いて。tests/lib/unreadCount.test.ts に置く", "should_trigger": false},
+  {"query": "mermaid でシーケンス図を描いて。ログインのフローで、ブログ記事に貼りたいだけ", "should_trigger": false},
+  {"query": "TODO コメントがソースコード中に散らばってるから、grep して一覧にして", "should_trigger": false},
+  {"query": "新入社員向けのオンボーディング資料の目次案を考えて。要件定義の進め方の章も入れたい（資料自体は Word で作る）", "should_trigger": false},
+  {"query": "RFC 9110 の仕様のうち、HTTP キャッシュの部分を要約して", "should_trigger": false},
+  {"query": "Playwright の E2E が CI で時々落ちる。リトライ設定とトレースの出し方を教えて", "should_trigger": false},
+  {"query": "プロジェクトの package.json の依存を最新に更新して、壊れたら直して", "should_trigger": false},
+  {"query": "GitHub Packages に npm パッケージを main への push で自動発行する workflow を書いて。このリポジトリは単なるライブラリです", "should_trigger": false}
+]

@@ -1,0 +1,33 @@
+{
+  "name": "@nekono-dev/spec-lint",
+  "version": "1.0.0",
+  "description": "仕様駆動開発の仕様書（specs・docs/architecture・poc）を機械的に検証する linter",
+  "license": "Unlicense",
+  "type": "module",
+  "bin": {
+    "spec-lint": "bin/spec-lint.mjs"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nekono-dev/spec-driven-development.git",
+    "directory": "lint"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "test": "node test/selftest.mjs && node test/selftest-lib.mjs && node test/selftest-docs.mjs"
+  },
+  "dependencies": {
+    "jsdom": "29.1.1",
+    "mermaid": "12.1.0",
+    "prettier": "3.9.10"
+  }
+}
