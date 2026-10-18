@@ -48,13 +48,13 @@ description: 機能の新規追加・修正に着手する前に、specs/<compon
 
 ## 開始時のスキル更新
 
-このスキルを使い始めるとき（spec・architecture・PoC の作業に着手する前）に、最初に 1 回だけ、スキル自身を最新にする。スキルのディレクトリは、この SKILL.md があるディレクトリ（symlink は `realpath` で実体を辿る）。
+このスキルを使い始めるとき（spec・architecture・PoC の作業に着手する前）に、最初に 1 回だけ、スキル自身を最新にする。クラウドセッションでも、この手順自体は行う。スキルのディレクトリは、この SKILL.md があるディレクトリ（symlink は `realpath` で実体を辿る）。
 
 1. スキルのディレクトリが git の作業ツリーの最上位か確認する: `git -C <スキルのディレクトリ> rev-parse --show-toplevel` が、そのディレクトリ自身を返す。
 2. 返すなら `git -C <スキルのディレクトリ> pull --ff-only` を実行する。
 3. 取り込みがあった（"Already up to date." 以外）ときは、更新後の `SKILL.md` を読み直し、`scripts/package.json` か `scripts/package-lock.json` が変わっていれば `scripts/` で `npm ci --ignore-scripts` を実行する。
 4. 失敗した（未コミットの変更、履歴の分岐、ネットワーク不通）ときは、強制せず（`reset`・`stash`・`--force` を使わない）、失敗の理由を 1 行で利用者に伝えて、現在の版のまま作業を続ける。
-5. git の作業ツリーでない（プロジェクトへの単なるコピー）ときは、更新できないことを 1 行で利用者に伝え、`git clone git@github.com.nekono:nekono-dev/spec-driven-development.git ~/.claude/skills/spec-driven-development` での導入を勧めて、そのまま作業を続ける。
+5. git の作業ツリーでない（プロジェクトへコミットして同梱したコピー、クラウドセッションを含む）ときは、このコピーは更新できないことを 1 行で利用者に伝えるだけにして、そのまま作業を続ける。手元（`~/.claude/skills/spec-driven-development`）で更新した分は、利用側のプロジェクトへコミットして取り込む。手元に未導入の場合のみ `git clone git@github.com.nekono:nekono-dev/spec-driven-development.git ~/.claude/skills/spec-driven-development` での導入を勧める。
 
 同じ会話の中では繰り返さない。利用者が更新しないよう指示したときは行わない。
 
@@ -83,7 +83,7 @@ description: 機能の新規追加・修正に着手する前に、specs/<compon
 
 図の構文検証（G014）だけが外部パッケージ（mermaid・jsdom）を使う。依存は `scripts/` に閉じ込めてあり、プロジェクトのルートの `package.json`・`node_modules` には触れない。Node 22.12 以上が必要。
 
-- 導入: プロジェクトのルートで `npm ci --ignore-scripts --prefix .claude/skills/spec-driven-development/scripts` を実行する（CI でも `lint:spec` の前に同じコマンドを置く）。
+- 導入: 手元ではクラウド用の開始フックが動かないため、最初に手動で実行する。プロジェクトのルートで `npm ci --ignore-scripts --prefix .claude/skills/spec-driven-development/scripts` を実行する（CI でも `lint:spec` の前に同じコマンドを置く）。
 - 未導入・版違いのとき: `lint:spec` は導入コマンドを表示して終了コード 1 で止まる。検証を黙って省かない。ただし図のない spec（構成表3行以下で「- なし」）だけを検査するときは依存を読み込まない。
 - `package.json` の版は完全固定する（`^` `~` を付けない）。版を変えるときは `npm install --ignore-scripts --prefix <scripts のパス>` で lockfile を更新し、`npm run test:spec` を通す。
 - `--no-syntax` は G014 を省く。selftest 専用で、`lint:spec` や CI では使わない。

@@ -11,6 +11,8 @@ cd ~/.claude/skills/spec-driven-development/scripts && npm ci --ignore-scripts
 
 要件: Node.js 22.12 以上。
 
+プロジェクトへ同梱して使う場合は、手元ではプロジェクトのルートで `npm ci --ignore-scripts --prefix .claude/skills/spec-driven-development/scripts` を手動で実行する（クラウド用の開始フックは手元では動かない）。未導入のまま `lint:spec` を実行すると、同じ手順が表示されて終了コード 1 で止まる。
+
 ## 更新
 
 スキルは使い始めるときに `git pull --ff-only` で自身を更新する（[SKILL.md](SKILL.md) の「開始時のスキル更新」）。手動で行う場合は、スキルのディレクトリで `git pull --ff-only` を実行する。
