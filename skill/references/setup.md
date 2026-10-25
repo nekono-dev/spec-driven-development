@@ -103,6 +103,20 @@ Node 22.12 以上が必要である。版は `<メジャー>.<マイナー>.<mai
 
 `spec-lint` の終了コードが 0 以外なら、CI を失敗させる。`--json` で機械可読な指摘を得られる。Markdown の整形（prettier）も `spec-lint` が P001 として検査する。プロジェクトの prettier 設定（`.prettierrc`・`.editorconfig`）を使い、コードブロックの中は整形しない。直すには `spec-lint --format [対象]`、整形の検査だけ省くには `--no-format` を付ける。
 
+### SPEC_LINT_TOKEN の登録
+
+`secrets.SPEC_LINT_TOKEN` は、`skill/scripts/register-token.sh` が `gh secret set` でカレントリポジトリの Actions Secret に登録する。SKILL.md の「開始時のトークン登録」が、作業の開始時に呼ぶ。人間が直接実行してもよい（`--force` で登録済みを上書きする）。
+
+| 項目 | 内容 |
+| --- | --- |
+| 読み込み元（上が優先） | リポジトリ直下の `.env`（`.gitignore` で無視されていること）、`~/.config/spec-driven/env`（全プロジェクト共通） |
+| 書式 | `SPEC_LINT_TOKEN=<read:packages 権限のトークン>`（1 行） |
+| 終了コード | 0=登録済み／3=トークン未設定／1=その他の失敗 |
+
+- `.env` が `.gitignore` で無視されていなければ、漏えいを避けるため読まない（共通ファイルへ進む）。
+- ファイルは `source` せず、該当の 1 行だけを取り出す。トークンは標準入力で `gh` に渡し、画面にも出さない。
+- 登録には、`gh auth login` 済みで、リポジトリの Secret を書ける権限が要る。
+
 ## 4. spec-lint の開発
 
 このリポジトリの `lint/` で開発する。
