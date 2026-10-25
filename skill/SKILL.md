@@ -65,10 +65,10 @@ spec-lint --format        # 整形の指摘（P001）を prettier で書き直�
 
 ## 開始時のスキル更新
 
-作業に着手する前に、最初に 1 回だけ、スキル自身を最新にする（同じ会話の中では繰り返さない。利用者が更新しないよう指示したときは行わない）。
+このスキルは Claude Code プラグイン `spec-driven-development@nekono-dev` として配布している。作業に着手する前に、最初に 1 回だけ、プラグインを最新にする（同じ会話の中では繰り返さない。利用者が更新しないよう指示したときは行わない）。
 
-1. スキルのディレクトリ（この SKILL.md があるディレクトリ。symlink は `realpath` で実体を辿る）が git の作業ツリーの中なら、`git -C <スキルのディレクトリ> pull --ff-only` を実行する。
-2. 失敗した（未コミットの変更、履歴の分岐、ネットワーク不通）ときは、強制せず（`reset`・`stash`・`--force` を使わない）、理由を 1 行で伝えて現在の版のまま続ける。
-3. git の作業ツリーでないときは、更新しないことを 1 行で伝えて続ける。
+1. `claude plugin marketplace update nekono-dev` でマーケットプレイスの一覧を取り込み、`claude plugin update spec-driven-development@nekono-dev` を実行する。
+2. 更新されたときは、反映が Claude Code の再起動後になることを 1 行で伝え、この会話は現在の版のまま続ける（再起動を待たない）。
+3. 失敗した（プラグインとして入っていない、`--plugin-dir` で読み込んでいる、ネットワーク不通など）ときは、理由を 1 行で伝えて現在の版のまま続ける。
 
 `spec-lint` の更新は `references/setup.md` に従う。

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "spec-driven-development",
+  "description": "機能の追加・修正の前に specs/<component>/ の requirements.md・design.md・tasks.md を雛形どおりに整備し、spec-lint で機械的に合否判定する仕様駆動開発の進め方。docs/architecture.md と PoC も同じ spec-lint で管理する。検査コマンド spec-lint は npm パッケージ @nekono-dev/spec-lint として別に配布する。",
+  "author": { "name": "nekono-dev" },
+  "repository": "https://github.com/nekono-dev/spec-driven-development",
+  "license": "Unlicense",
+  "skills": ["./skill"]
+}
